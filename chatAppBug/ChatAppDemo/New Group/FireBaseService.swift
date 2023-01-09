@@ -5,6 +5,7 @@
 //  Created by BeeTech on 16/12/2022.
 //
 import Firebase
+import RxSwift
 
 class FirebaseService {
     
@@ -17,6 +18,20 @@ class FirebaseService {
     private let _message = "message"
     private let _imageMessage = "ImageMessage"
     private let _avatar = "Avatar"
+    
+    func fetchUserRxSwift() -> Observable<[User]> {
+        return Observable.create {[weak self] observable in
+            let listen = self?.db.collection(self?._user ?? "").addSnapshotListener({ querySnapShot, error in
+                if error != nil {return}
+                guard let data = querySnapShot?.documents else {return}
+                let user = data.map({User(dict: $0.data())})
+                observable.onNext(user)
+            })
+            return Disposables.create()
+            listen?.remove()
+        }
+       
+    }
     
     func fetchUser(_ completed: @escaping ([User]) -> Void) {
         self.users.removeAll()
@@ -35,26 +50,25 @@ class FirebaseService {
     }
     
     // MARK: fetchMessage
-    
-    func fetchMessage(_ receiverUser: User, senderUser: User, completed: @escaping ([Message]) -> Void) {
-        self.messages.removeAll()
-        db.collection(_message)
-            .document(senderUser.id)
-            .collection(receiverUser.id)
-            .addSnapshotListener {[weak self] querySnapshot, error in
-                if error != nil { return }
-                guard let snapshot = querySnapshot else {return}
-                self?.messages.removeAll()
-                snapshot.documentChanges.forEach { doc in
-                    if doc.type == .added || doc.type == .removed {
-                        let message = Message(dict: doc.document.data())
-                        self?.messages.append(message)
+    func fetchMessageRxSwift(_ receiverUser: User, senderUser: User) -> Observable<[String: Any]> {
+        return Observable.create {[weak self] observable in
+            let listen = self?.db.collection(self?._message ?? "")
+                .document(senderUser.id)
+                .collection(receiverUser.id)
+                .addSnapshotListener { queriSnapshot, error in
+                    if error != nil {return}
+                    guard let data = queriSnapshot?.documentChanges else {return}
+                    data.forEach { doc in
+                        if doc.type == .added || doc.type == .removed {
+                            let value = doc.document.data()
+                            observable.onNext(value)
+                        }
                     }
                 }
-                completed(self?.messages ?? [])
-            }
+            return Disposables.create()
+            listen?.remove()
+        }
     }
-    
     
     // MARK: SendMessage
     func sendMessage(with message: String, receiverUser: User, senderUser: User) {
@@ -76,21 +90,15 @@ class FirebaseService {
                 "read": false,
                 "messageKey": autoKey
         ]
-        
         document.setData(data)
-        
         let reciverDocument = db.collection(_message)
             .document(receiverUser.id)
             .collection(senderUser.id)
             .document()
-       
         reciverDocument.setData(data)
-        
     }
     
-   
     func setImageMessage(_ image: UIImage, receiverUser: User, senderUser: User) {
-        
         let autoKey = self.db.collection(_message).document().documentID
         let storeRef = Storage.storage().reference()
         let imageKey = NSUUID().uuidString
@@ -136,24 +144,21 @@ class FirebaseService {
         
     }
     
-    
-    
     func changeStateReadMessage(_ senderUser: User, revicerUser: User) {
         self.db.collection(_message)
             .document(senderUser.id)
             .collection(revicerUser.id)
-            //.document()
             .whereField("read", isEqualTo: false)
             .getDocuments { querydata, error in
-                if error != nil { return }
+                if error != nil {return}
                 guard let doc = querydata?.documents else { return }
                 doc.forEach { [weak self] doc in
                     let value = Message(dict: doc.data())
-                    if value.sendId == revicerUser.id && value.receiverID == senderUser.id {
+                    if value.receiverID == revicerUser.id || value.receiverID == senderUser.id {
                         self?.db.collection(self!._message)
                             .document(senderUser.id)
                             .collection(revicerUser.id)
-                            .document(value.messageID)
+                            .document()
                             .updateData(["read" : true])
                     }
                 }

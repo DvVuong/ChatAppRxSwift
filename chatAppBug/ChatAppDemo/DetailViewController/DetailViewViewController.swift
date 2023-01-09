@@ -12,7 +12,7 @@ import RxCocoa
 final class DetailViewViewController: UIViewController {
     static func instance(_ data: User, currentUser: User) -> DetailViewViewController {
         let vc = UIStoryboard(name: "Main", bundle: nil).instantiateViewController(withIdentifier: "DetailScreen") as! DetailViewViewController
-        vc.viewModel = DetailPresenter( data: data, currentUser: currentUser)
+        vc.viewModel = DetailViewModel( data: data, currentUser: currentUser)
         return vc
     }
     
@@ -33,11 +33,12 @@ final class DetailViewViewController: UIViewController {
     
     private let bag = DisposeBag()
     private var imgPicker = UIImagePickerController()
-    private var viewModel: DetailPresenter!
+    private var viewModel: DetailViewModel!
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -89,10 +90,9 @@ final class DetailViewViewController: UIViewController {
     private func bindTableView() {
         //MARK: UItableView
         let currentUser = viewModel.getCurrentUser()
-       
         convertiontable.rx.setDelegate(self).disposed(by: bag)
+        
         viewModel.messageBehaviorSubject.bind(to: self.convertiontable.self.rx.items) { tableview, index, data in
-            self.scrollToBottom()
             if data.text.isEmpty {
                 let cell = self.convertiontable.dequeueReusableCell(withIdentifier: "imgCell") as! ImgCell
                 cell.updateUI(data, currentUser: currentUser)
@@ -106,12 +106,12 @@ final class DetailViewViewController: UIViewController {
             } else {
                 let cell = self.convertiontable.dequeueReusableCell(withIdentifier: "reciverUser") as! ReciverUserCell
                 cell.updateUI(data)
+                self.scrollToBottom()
                 return cell
             }
            
         }
         .disposed(by: bag)
-        
         //MARK: ShowUser, stateActive
         viewModel.stateUserPublisher.subscribe {[weak self] users in
             if let users = users.element {
@@ -122,7 +122,6 @@ final class DetailViewViewController: UIViewController {
                 }
             }
         }.disposed(by: bag)
-        
         viewModel.imageUserPublisher.subscribe {[weak self] image in
             if let image = image {
                 DispatchQueue.main.async {
@@ -162,6 +161,7 @@ final class DetailViewViewController: UIViewController {
         btSendMessage.setImage(UIImage(systemName: "hand.thumbsup.fill"), for: .normal)
         heightTextViewContrains.constant = 33
         view.layoutIfNeeded()
+        self.scrollToBottom()
     }
     
     private func scrollToBottom() {
@@ -173,7 +173,6 @@ final class DetailViewViewController: UIViewController {
     }
     
     //MARK: -Acction
-        
     @objc private func didTapSend(_ sender: UIButton) {
         self.sendMessage()
     }
@@ -191,7 +190,6 @@ final class DetailViewViewController: UIViewController {
     @objc func handleViewEndEditing(_ gesture: UITapGestureRecognizer) {
         self.view.endEditing(true)
     }
-    
 }
 //MARK: -Extension UIImagePickerControllerDelegate
 extension DetailViewViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
@@ -206,8 +204,6 @@ extension DetailViewViewController: UIImagePickerControllerDelegate, UINavigatio
         self.imgPicker.dismiss(animated: true)
     }
 }
-
-
 //MARK: -Extension UitableView
 extension DetailViewViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
@@ -219,7 +215,6 @@ extension DetailViewViewController: UITableViewDelegate {
         }
     }
 }
-
 //MARK: Extension UItextFiled
 extension DetailViewViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -231,7 +226,6 @@ extension DetailViewViewController: UITextFieldDelegate {
         btSendMessage.setImage(UIImage(systemName: "hand.thumbsup.fill"), for: .normal)
     }
 }
-
 extension DetailViewViewController {
     @objc func keyboardWillShow(_ sender: NSNotification) {
         let keyboardframe = (sender.userInfo?[UIResponder.keyboardFrameEndUserInfoKey]! as! NSValue).cgRectValue.height

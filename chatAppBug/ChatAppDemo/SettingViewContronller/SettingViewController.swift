@@ -33,7 +33,7 @@ final class SettingViewController: UIViewController {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         setupUI()
-        
+        self.navigationItem.title = "Setting"
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {

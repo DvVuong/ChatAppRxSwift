@@ -28,7 +28,6 @@ class SiginViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        onBind()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -38,10 +37,10 @@ class SiginViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
     
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        navigationController?.setNavigationBarHidden(false, animated: animated)
-    }
+//    override func viewWillDisappear(_ animated: Bool) {
+//        super.viewWillDisappear(animated)
+//        navigationController?.setNavigationBarHidden(false, animated: animated)
+//    }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         view.endEditing(true)
@@ -56,24 +55,12 @@ class SiginViewController: UIViewController {
         //btSigin.isEnabled = false
     }
     
-    private func onBind() {
-//        presenter.emailError.bind(to: lbEmailError.rx.text).disposed(by: disponeBag)
-//        lbEmailError.isHidden = false
-//
-//        presenter.passwordError.bind(to: lbPasswordError.rx.text).disposed(by: disponeBag)
-//        lbPasswordError.isHidden = false
-//
-//        Observable.combineLatest(presenter.emailError.map {$0 == nil},
-//                                 presenter.passwordError.map {$0 == nil})
-//        .map{$0.0 && $0.1}.subscribe { bool in
-//            self.btSigin.isEnabled  = bool
-//        }
-//        .disposed(by: disponeBag)
-   }
-    
     private func setupUITextField() {
         lbEmailError.isHidden = true
         lbPasswordError.isHidden = true
+        
+        tfEmail.text = "long@gmail.com"
+        tfPassword.text = "123456"
         
         tfEmail.rx.controlEvent(.editingDidEnd).map {[weak self]textField in
             return self?.tfEmail.text
@@ -131,9 +118,13 @@ class SiginViewController: UIViewController {
                        navigationController?.pushViewController(vc, animated: true)
                    }
                    else {
-                       return
+                       presenter.emailError.bind(to: lbEmailError.rx.text).disposed(by: disponeBag)
+                       lbEmailError.isHidden = false
+                       presenter.passwordError.bind(to: lbPasswordError.rx.text).disposed(by: disponeBag)
+                       lbPasswordError.isHidden = false
                    }
                }
+        view.endEditing(true)
     }
    
     @objc private func didTapSigup(_ sender: UIButton) {
@@ -159,14 +150,6 @@ class SiginViewController: UIViewController {
     @IBAction private func loginWithZalo(_ sender: Any) {
         presenter.loginZalo(self)
     }
-    
-    @IBAction func didTapGotoRxSwift(_ sender: Any) {
-        
-        let vc = DemoRxViewController.instance()
-        navigationController?.pushViewController(vc, animated: true)
-    }
-    
-    
 }
 
 extension SiginViewController: SignInPresenterDelegate {

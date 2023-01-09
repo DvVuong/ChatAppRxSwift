@@ -10,13 +10,20 @@ import UIKit
 class ListUserActiveCollectionCell: UICollectionViewCell {
     @IBOutlet private weak var img: UIImageView!
     @IBOutlet private weak var lbName: UILabel!
-    @IBOutlet private weak var imgState: CustomImage!
+    @IBOutlet private weak var imgState: UIImageView!
     
     
     override  func awakeFromNib() {
         img.layer.cornerRadius = img.frame.height / 2
         img.layer.masksToBounds = true
         img.contentMode = .scaleToFill
+        
+        imgState.layer.cornerRadius = imgState.frame.height / 2
+        imgState.layer.masksToBounds = true
+        imgState.contentMode = .scaleToFill
+        imgState.layer.borderWidth = 2
+        imgState.layer.borderColor = UIColor.white.cgColor
+        
     }
     
     func updateUI(_ user: User?, text: String) {

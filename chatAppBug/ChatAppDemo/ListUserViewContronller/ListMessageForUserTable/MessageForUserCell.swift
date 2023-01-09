@@ -13,6 +13,7 @@ class MessageForUserCell: UITableViewCell {
     @IBOutlet private weak var imgAvt: UIImageView!
     @IBOutlet private weak var bubbleView: UIView!
     @IBOutlet private weak var imgState: UIImageView!
+    @IBOutlet private weak var imgStateReciverUser: UIImageView!
     
     
     @IBOutlet weak var lbTime: UILabel!
@@ -30,6 +31,12 @@ class MessageForUserCell: UITableViewCell {
         bubbleView.layer.cornerRadius = 10
         bubbleView.layer.masksToBounds = true
         
+        imgStateReciverUser.layer.cornerRadius = imgStateReciverUser.frame.height / 2
+        imgStateReciverUser.layer.masksToBounds = true
+        imgStateReciverUser.layer.borderWidth = 2
+        imgStateReciverUser.layer.borderColor = UIColor.white.cgColor
+        
+        
     }
 
     override func setSelected(_ selected: Bool, animated: Bool) {
@@ -44,9 +51,12 @@ class MessageForUserCell: UITableViewCell {
         let time = Date(timeIntervalSince1970: TimeInterval(message.time))
         let dateFormater = DateFormatter()
         dateFormater.dateFormat = "hh:mm"
-        
+       
         lbTime.text = dateFormater.string(from: time)
         // Show Message and State message
+        if message.sendId == currentUser.id && message.receiverID == reciverUser.id {
+            self.imgStateReciverUser.tintColor = reciverUser.isActive ? .systemGreen : .systemGray
+        }
         
         if message.sendId == currentUser.id || message.receiverID == reciverUser.id {
             lbMessage.text = "you: \(message.text)"
@@ -57,6 +67,8 @@ class MessageForUserCell: UITableViewCell {
                     self.imgAvt.image = image
                 }
             }
+            
+           
             
         } else {
             

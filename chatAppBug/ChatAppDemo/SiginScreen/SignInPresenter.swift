@@ -123,6 +123,10 @@ class SignInPresenter {
         }
     
     func validateEmail(_ email: String) -> (Bool, String?) {
+        if email.isEmpty {
+            return (false, "Email can't not empty")
+        }
+        
         if let user = users.first(where: { $0.email == email }) {
             self.currentUser = user
             return (true, nil)
@@ -132,6 +136,10 @@ class SignInPresenter {
     }
     
     func validatePassword(_ password: String) -> (Bool, String?) {
+        if password.isEmpty {
+            return (false, "Password can't not empty")
+        }
+        
         if let user = users.first(where: { $0.password == password }) { self.currentUser = user
             return (true, nil)
         } else {

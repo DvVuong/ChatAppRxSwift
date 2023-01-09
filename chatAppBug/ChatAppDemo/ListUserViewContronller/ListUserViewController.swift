@@ -12,7 +12,7 @@ import RxCocoa
 final class ListUserViewController: UIViewController {
     static func instance(_ currentUser: User) -> ListUserViewController {
         let vc = UIStoryboard(name: "Main", bundle: nil).instantiateViewController(withIdentifier: "listUserScreen") as! ListUserViewController
-        vc.viewModel = ListUserPresenter(with: vc, data: currentUser)
+        vc.viewModel = ListUserViewModel(with: currentUser)
         return vc
     }
     
@@ -30,13 +30,21 @@ final class ListUserViewController: UIViewController {
     @IBOutlet private weak var listAllUserTopContrain: NSLayoutConstraint!
     @IBOutlet private weak var heightSearchUserContrains: NSLayoutConstraint!
     @IBOutlet private weak var trailingSearchUserContrains: NSLayoutConstraint!
+    @IBOutlet private weak var heightCollectionViewContrains: NSLayoutConstraint!
     
-    private var viewModel: ListUserPresenter!
+    private var viewModel: ListUserViewModel!
     private var disponeBag = DisposeBag()
     lazy private var presenterCell = ListCellPresenter()
     
     override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
         navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     
     override func viewDidLoad() {
@@ -44,8 +52,13 @@ final class ListUserViewController: UIViewController {
         setupUI()
         setupData()
         onBind()
-        setupData()
     }
+    private func setupData() {
+        viewModel.fetchUserRxSwift()
+        viewModel.fectchMessageRxSwift()
+        viewModel.getImageForCurrentUser()
+    }
+
     
     private func setupUI() {
         setupMessagetable()
@@ -55,19 +68,20 @@ final class ListUserViewController: UIViewController {
         setupLbNameUser()
         setuplbNewMessageNotification()
         setupBtCacncelSearchUser()
+        setuplbNewMessageNotification()
     }
     
     private func onBind() {
         setupCollectionViewRxSwift()
         setupListUserTableView()
+        viewModel.imgAvatarUserPublisher.subscribe {[weak self] img in
+            DispatchQueue.main.async {
+                self?.avatar.image = img
+            }
+        }.disposed(by: disponeBag)
     }
     
-    private func setupData() {
-        viewModel.getImageForCurrentUser()
-        viewModel.fetchUserRxSwift()
-        viewModel.fectchMessageRxSwift()
-    }
-
+    
     private func setupCollectionViewRxSwift() {
         guard let currentUser = viewModel.currentUser else {return}
         viewModel.activeUsers.bind(to: self.listUserActive.rx
@@ -75,12 +89,12 @@ final class ListUserViewController: UIViewController {
                    ,cellType: ListUserActiveCollectionCell.self)) { index, data, cell in
             cell.updateUI(data, text: self.searchUser.text ?? "")
         }.disposed(by: disponeBag)
-        
          //MARK: Seclected Items
         self.listUserActive.rx.modelSelected(User.self).bind { user in
             let vc = DetailViewViewController.instance(user, currentUser: currentUser)
             self.navigationController?.pushViewController(vc, animated: true)
         }.disposed(by: self.disponeBag)
+        listUserActive.rx.setDelegate(self).disposed(by: disponeBag)
     }
     
     private func setupListUserTableView() {
@@ -91,14 +105,11 @@ final class ListUserViewController: UIViewController {
         viewModel.finalUser.bind(to: self.listAllUser.rx.items(cellIdentifier: "listUsertableCell", cellType: ListAllUserTableCell.self)) { index, data, cell in
             cell.updateUI(data)
         }.disposed(by: disponeBag)
-    
         listAllUser.rx.modelSelected(User.self).subscribe {[weak self] user in
             let vc = DetailViewViewController.instance(user, currentUser: currentUser)
             self?.navigationController?.pushViewController(vc, animated: true)
         }.disposed(by: disponeBag)
-        
         //MARK: MessageTableView
-    
         messageTable.rx.setDelegate(self).disposed(by: disponeBag)
         viewModel.messageBehaviorSubject.bind(to: self.messageTable.rx.items(cellIdentifier: "messageforUserCell", cellType: MessageForUserCell.self)) { index, data, cell in
             self.viewModel.reciverUser.subscribe { users in
@@ -109,13 +120,20 @@ final class ListUserViewController: UIViewController {
                 }
             }.disposed(by: self.disponeBag)
         }.disposed(by: disponeBag)
+        //MARK: ModelSeclected
         
         messageTable.rx.modelSelected(Message.self).subscribe {[weak self] mess in
             if let mess = mess.element {
+//                if mess.sendId == currentUser.id {
+//                    self?.viewModel.changesStateReadMessage()
+//                }
+                
                 let user = User(name: mess.receivername, id: mess.receiverID, picture: mess.avatarReciverUser, email: "", password: "", isActive: false)
+                print("vuongdv", user.name)
                 let vc = DetailViewViewController.instance(user, currentUser: currentUser)
                 self?.navigationController?.pushViewController(vc, animated: true)
             }
+            
         }.disposed(by: disponeBag)
     }
     
@@ -134,13 +152,11 @@ final class ListUserViewController: UIViewController {
         searchUser.layer.borderWidth = 1
         searchUser.layer.borderColor = UIColor.black.cgColor
         searchUser.delegate = self
-        
         searchUser.rx.controlEvent(.editingChanged).map {[weak self] textField in
             return self?.searchUser.text
         }.subscribe(onNext: {[weak self]text in
             self?.viewModel.searchUserPublisher.onNext(text ?? "")
         }).disposed(by: disponeBag)
-        
     }
     
     private func setupImageForCurrentUser() {
@@ -158,6 +174,16 @@ final class ListUserViewController: UIViewController {
     
     private func setuplbNewMessageNotification() {
         lbNewMessageNotification.isHidden = true
+        lbNewMessageNotification.text = "No new message \nNew messages will show up here"
+        viewModel.messageBehaviorSubject.subscribe { messages in
+            if let messages = messages.element {
+                if messages.count == 0 {
+                    self.lbNewMessageNotification.isHidden = false
+                }else {
+                    self.lbNewMessageNotification.isHidden = true
+                }
+            }
+        }.disposed(by: disponeBag)
     }
     
     private func setupBtSetting() {
@@ -191,14 +217,16 @@ extension ListUserViewController: UITableViewDelegate {
         return 100
     }
 }
-//MARK: Extension
-extension ListUserViewController: ListUserPresenterDelegate {
-    func didGetImageForCurrentUser(_ image: UIImage) {
-        DispatchQueue.main.async {
-            self.avatar.image = image
-        }
+
+extension ListUserViewController: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+        return 5
+    }
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        return CGSize(width: 100, height: 100)
     }
 }
+//MARK: Extension
 
 extension ListUserViewController: UITextFieldDelegate {
     func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
