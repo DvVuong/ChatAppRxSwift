@@ -6,19 +6,15 @@
 //
 
 import Firebase
+import FirebaseFirestore
 import FBSDKLoginKit
-import RxCocoa
 import RxSwift
 
 protocol SignInPresenterDelegate: NSObject {
     func showUserRegiter(_ email: String, password: String)
-    func didLoginZalo(_ user: User?)
-    func didLoginFacebook(_ user: User?)
-    func didLoginGoogle(_ user: User?)
-    func didValidateSocialMediaAccount(_ user: User?, bool: Bool)
 }
 
-class SignInPresenter {
+class SinginViewModel {
     //MARK: -Properties
     private weak var view: SignInPresenterDelegate?
     private var users = [User]()
@@ -72,42 +68,65 @@ class SignInPresenter {
     
     
     //MARK: -Login
-    func loginZalo(_ vc: SiginViewController) {
-        ZaloService.shared.login(vc) {[weak self] email, name, id, url in
-            let user = User(name: name, id: id, picture: url, email: email, password: "", isActive: false)
-            FirebaseService.share.registerSocialMedia(name, email: email, id: id, picture: url)
-            self?.changeStateUser(user)
-            self?.view?.didLoginZalo(user)
+    func loginZalo(_ vc: SiginViewController) -> Observable<User> {
+        return Observable.create { observable in
+            ZaloService.shared.login(vc)
+            
+            ZaloService.shared.userZalo.subscribe {[weak self] user in
+                if let user = user.element {
+                    print("vuongdv", user)
+                    FirebaseService.share.registerSocialMedia(user.name, email: user.email, id: user.id, picture: user.picture)
+                    self?.changeStateUser(user)
+                    observable.onNext(user)
+                }
+            }.disposed(by: self.disponeBag)
+            return Disposables.create()
+        }
+    }
+
+    func loginWithGoogle(_ vc: SiginViewController) -> Observable<User> {
+        return Observable.create {[weak self] observable in
+            GoogleService.shared.login(vc).subscribe { [weak self] user in
+                if let user = user.element {
+                    self?.changeStateUser(user)
+                    FirebaseService.share.registerSocialMedia(user.name, email: user.email, id: user.id, picture: user.picture)
+                    observable.onNext(user)
+                }
+            }.disposed(by: self?.disponeBag ?? DisposeBag())
+            return Disposables.create()
         }
     }
     
-    func loginWithGoogle(_ vc: SiginViewController) {
-        GoogleService.shared.login(vc) {[weak self] user in
-            FirebaseService.share.registerSocialMedia(user.name, email: user.email, id: user.id, picture: user.picture)
-            self?.changeStateUser(user)
-            self?.view?.didLoginGoogle(user)
+    func loginWithFacebook(_ loginButton: FBLoginButton, didCompleteWith result: LoginManagerLoginResult?, error: Error?) -> Observable<User> {
+        return Observable.create { observable in
+            FaceBookService.shared.login(loginButton, didCompleteWith: result, error: error).subscribe { [weak self] data in
+                if let data = data.element {
+                    print("vuongdv3",data.0)
+                    self?.registerSocialMediaAccount(data.1)
+                    self?.changeStateUser(data.0)
+                    observable.onNext(data.0)
+                }
+            }.disposed(by: self.disponeBag)
+            return Disposables.create()
         }
-    }
-    
-    func loginWithFacebook(_ loginButton: FBLoginButton, didCompleteWith result: LoginManagerLoginResult?, error: Error?) {
-        FaceBookService.shared.login(loginButton, didCompleteWith: result, error: error) {[weak self] result, user in
-            self?.registerSocialMediaAccount(result)
-            self?.changeStateUser(user)
-            self?.view?.didLoginFacebook(user)
-        }
+       
     }
     
     //MARK: -Validate
-    func validateSocialMediaAccount(_ email: String) {
-        var currentUser: User?
-        var isvalid: Bool = false
-        users.forEach { user in
-            if user.email == email {
-                currentUser = user
-                isvalid = true
+    func validateSocialMediaAccount(_ email: String) -> Observable<(Bool,User?)>{
+        return Observable.create { observable in
+            var currentUser: User?
+            var isvalid: Bool = false
+            self.users.forEach { user in
+                if user.email == email {
+                    currentUser = user
+                    isvalid = true
+                }
             }
+            observable.onNext((isvalid, currentUser))
+            return Disposables.create()
         }
-        view?.didValidateSocialMediaAccount(currentUser, bool: isvalid)
+       
     }
     
     func validateEmailPassword(_ email: String, _ password: String, completion: (_ currentUser: User?, Bool) -> Void) {
@@ -122,6 +141,7 @@ class SignInPresenter {
             completion(currentUser, isvalid)
         }
     
+    // Use Show error on lable
     func validateEmail(_ email: String) -> (Bool, String?) {
         if email.isEmpty {
             return (false, "Email can't not empty")
@@ -152,7 +172,6 @@ class SignInPresenter {
     func changeStateUser(_ currentUser: User) {
         FirebaseService.share.changeStateActiveForUser(currentUser)
     }
-    
     
     func getUserData() -> [User] {
         return users

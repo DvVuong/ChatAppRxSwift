@@ -59,7 +59,6 @@ final class ListUserViewController: UIViewController {
         viewModel.getImageForCurrentUser()
     }
 
-    
     private func setupUI() {
         setupMessagetable()
         setupSearchUser()
@@ -81,15 +80,25 @@ final class ListUserViewController: UIViewController {
         }.disposed(by: disponeBag)
     }
     
-    
     private func setupCollectionViewRxSwift() {
+        //MARK: Show or hide collectionview when Have User Active
+        viewModel.activeUsers.subscribe { [weak self] users in
+            if let users = users.element {
+                if users.count == 0 {
+                    self?.heightCollectionViewContrains.constant = 0
+                }else {
+                    self?.heightCollectionViewContrains.constant = 128
+                }
+            }
+        }.disposed(by: disponeBag)
+        //MARK: list User ACtive
         guard let currentUser = viewModel.currentUser else {return}
         viewModel.activeUsers.bind(to: self.listUserActive.rx
             .items(cellIdentifier: "listActiveUserCell"
                    ,cellType: ListUserActiveCollectionCell.self)) { index, data, cell in
             cell.updateUI(data, text: self.searchUser.text ?? "")
         }.disposed(by: disponeBag)
-         //MARK: Seclected Items
+         //MARK: Seclected model
         self.listUserActive.rx.modelSelected(User.self).bind { user in
             let vc = DetailViewViewController.instance(user, currentUser: currentUser)
             self.navigationController?.pushViewController(vc, animated: true)
@@ -105,10 +114,12 @@ final class ListUserViewController: UIViewController {
         viewModel.finalUser.bind(to: self.listAllUser.rx.items(cellIdentifier: "listUsertableCell", cellType: ListAllUserTableCell.self)) { index, data, cell in
             cell.updateUI(data)
         }.disposed(by: disponeBag)
+        //MARK: ModelSelected
         listAllUser.rx.modelSelected(User.self).subscribe {[weak self] user in
             let vc = DetailViewViewController.instance(user, currentUser: currentUser)
             self?.navigationController?.pushViewController(vc, animated: true)
         }.disposed(by: disponeBag)
+        
         //MARK: MessageTableView
         messageTable.rx.setDelegate(self).disposed(by: disponeBag)
         viewModel.messageBehaviorSubject.bind(to: self.messageTable.rx.items(cellIdentifier: "messageforUserCell", cellType: MessageForUserCell.self)) { index, data, cell in
@@ -120,20 +131,25 @@ final class ListUserViewController: UIViewController {
                 }
             }.disposed(by: self.disponeBag)
         }.disposed(by: disponeBag)
-        //MARK: ModelSeclected
         
+        //MARK: ModelSeclected
         messageTable.rx.modelSelected(Message.self).subscribe {[weak self] mess in
             if let mess = mess.element {
-//                if mess.sendId == currentUser.id {
-//                    self?.viewModel.changesStateReadMessage()
-//                }
+                if mess.sendId == currentUser.id {
+                    self?.viewModel.changesStateReadMessage()
+                }
+                if mess.receiverID == currentUser.id {
+                    let user = User(name: mess.nameSender, id: mess.sendId, picture: mess.avataSender, email: "", password: "", isActive: false)
+                    let vc = DetailViewViewController.instance(user, currentUser: currentUser)
+                    self?.navigationController?.pushViewController(vc, animated: true)
+                }
                 
-                let user = User(name: mess.receivername, id: mess.receiverID, picture: mess.avatarReciverUser, email: "", password: "", isActive: false)
-                print("vuongdv", user.name)
-                let vc = DetailViewViewController.instance(user, currentUser: currentUser)
-                self?.navigationController?.pushViewController(vc, animated: true)
+                if mess.sendId == currentUser.id {
+                    let user2 = User(name: mess.receivername, id: mess.receiverID, picture: mess.avatarReciverUser, email: "", password: "", isActive: false)
+                    let vc = DetailViewViewController.instance(user2, currentUser: currentUser)
+                    self?.navigationController?.pushViewController(vc, animated: true)
+                }
             }
-            
         }.disposed(by: disponeBag)
     }
     
@@ -211,13 +227,14 @@ final class ListUserViewController: UIViewController {
         view.endEditing(true)
     }
 }
-// MARK: TableView
+// MARK: Extension TableView
 extension ListUserViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 100
     }
 }
 
+// MARK: Extension collectionView
 extension ListUserViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 5
@@ -226,8 +243,8 @@ extension ListUserViewController: UICollectionViewDelegateFlowLayout {
         return CGSize(width: 100, height: 100)
     }
 }
-//MARK: Extension
 
+//MARK: Extension
 extension ListUserViewController: UITextFieldDelegate {
     func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
         if textField === searchUser {

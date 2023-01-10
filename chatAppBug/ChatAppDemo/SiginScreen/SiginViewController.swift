@@ -11,8 +11,7 @@ import FBSDKLoginKit
 import RxSwift
 import RxCocoa
 
-
-class SiginViewController: UIViewController {
+final class SiginViewController: UIViewController {
     @IBOutlet private weak var tfEmail: CustomTextField!
     @IBOutlet private weak var tfPassword: CustomTextField!
     @IBOutlet private weak var btSaveData: CustomButton!
@@ -22,8 +21,7 @@ class SiginViewController: UIViewController {
     @IBOutlet private weak var lbEmailError: UILabel!
     @IBOutlet private weak var lbPasswordError: UILabel!
     
-
-    lazy private var presenter = SignInPresenter(with: self)
+    lazy private var presenter = SinginViewModel(with: self)
     private var disponeBag = DisposeBag()
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -36,12 +34,7 @@ class SiginViewController: UIViewController {
         
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
-    
-//    override func viewWillDisappear(_ animated: Bool) {
-//        super.viewWillDisappear(animated)
-//        navigationController?.setNavigationBarHidden(false, animated: animated)
-//    }
-    
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         view.endEditing(true)
     }
@@ -144,40 +137,25 @@ class SiginViewController: UIViewController {
     }
     
     @IBAction private func didTapLoginWithGoogle(_ sender: Any) {
-        presenter.loginWithGoogle(self)
+        presenter.loginWithGoogle(self).subscribe { [weak self] user in
+            if let  user = user.element {
+                let vc = ListUserViewController.instance(user)
+                self?.navigationController?.pushViewController(vc, animated: true)
+            }
+        }.disposed(by: disponeBag)
     }
     
     @IBAction private func loginWithZalo(_ sender: Any) {
-        presenter.loginZalo(self)
+        presenter.loginZalo(self).subscribe { [weak self] user in
+            if let user = user.element {
+                let vc = ListUserViewController.instance(user)
+                self?.navigationController?.pushViewController(vc, animated: true)
+            }
+        }.disposed(by: disponeBag)
     }
 }
 
 extension SiginViewController: SignInPresenterDelegate {
-    func didValidateSocialMediaAccount(_ user: User?, bool: Bool) {
-        guard let user = user else {return}
-        if bool {
-            let vc = ListUserViewController.instance(user)
-            self.navigationController?.pushViewController(vc, animated: true)
-        }
-    }
-    
-    func didLoginZalo(_ user: User?) {
-        guard let user = user else {return}
-        let vc = ListUserViewController.instance(user)
-        self.navigationController?.pushViewController(vc, animated: true)
-    }
-    
-    func didLoginFacebook(_ user: User?) {
-        guard let user = user else {return}
-        self.presenter.validateSocialMediaAccount(user.email)
-    }
-    
-    func didLoginGoogle(_ user: User?) {
-        guard let user = user else {return}
-        let vc = ListUserViewController.instance(user)
-        self.navigationController?.pushViewController(vc, animated: true)
-    }
-    
     func showUserRegiter(_ email: String, password: String) {
         self.tfEmail.text = email
         self.tfPassword.text = password
@@ -198,7 +176,20 @@ extension SiginViewController: LoginButtonDelegate {
     }
     
     func loginButton(_ loginButton: FBLoginButton, didCompleteWith result: LoginManagerLoginResult?, error: Error?) {
-        presenter.loginWithFacebook(loginButton, didCompleteWith: result, error: error)
-        }
+        presenter.loginWithFacebook(loginButton, didCompleteWith: result, error: error).subscribe { [weak self] user in
+            if let user = user.element {
+                self?.presenter.validateSocialMediaAccount(user.email).subscribe {[weak self] valiPair in
+                    if let valiPair = valiPair.element  {
+                        if valiPair.0 {
+                            guard let user = valiPair.1 else {return}
+                            let vc = ListUserViewController.instance(user)
+                            self?.navigationController?.pushViewController(vc, animated: true)
+                        }
+                    }
+                    
+                }.disposed(by: self!.disponeBag)
+            }
+        }.disposed(by: disponeBag)
+    }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import Firebase
+import FirebaseFirestore
 import RxSwift
 import RxCocoa
 class ListUserViewModel {
